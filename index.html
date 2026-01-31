@@ -1,152 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VENOMSHOT ZOMBIE SURVIVAL</title>
+    <title>VENOMSHOT FIX</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
-        canvas { display: block; background: #1a1a1a; }
-        #ui { position: fixed; top: 15px; left: 15px; pointer-events: none; z-index: 10; }
-        .stat { font-size: 22px; color: #ff0000; text-shadow: 2px 2px #000; margin-bottom: 5px; }
-        #gameOver { 
-            display: none; position: fixed; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); text-align: center; 
-            background: rgba(0,0,0,0.95); padding: 30px; 
-            border: 3px solid red; border-radius: 20px; z-index: 100;
-        }
+        body { margin: 0; background: #111; color: red; overflow: hidden; touch-action: none; text-align: center; }
+        canvas { display: block; background: #000; margin: 0 auto; }
+        #stats { position: fixed; top: 10px; left: 10px; font-family: sans-serif; font-size: 20px; }
     </style>
 </head>
 <body>
+    <div id="stats">KILLS: <span id="sc">0</span> | HP: <span id="hp">100</span></div>
+    <canvas id="g"></canvas>
 
-    <div id="ui">
-        <div class="stat">KILLS: <span id="score">0</span></div>
-        <div class="stat">HP: <span id="health">100</span>%</div>
-    </div>
+<script>
+    const c = document.getElementById('g'), x = c.getContext('2d');
+    let w = c.width = window.innerWidth, h = c.height = window.innerHeight;
+    let score = 0, health = 100, active = true;
+    let p = {x: w/2, y: h/2}, bullets = [], enemies = [];
 
-    <div id="gameOver">
-        <h1 style="color: red; font-size: 40px; margin: 0;">YOU DIED</h1>
-        <p id="finalScore" style="color: white; font-size: 20px;"></p>
-        <button onclick="location.reload()" style="padding: 15px 30px; background: red; color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 10px;">RESTART MISSION</button>
-    </div>
+    window.onmousedown = window.ontouchstart = (e) => {
+        if(!active) return;
+        let tx = e.clientX || e.touches[0].clientX, ty = e.clientY || e.touches[0].clientY;
+        let ang = Math.atan2(ty - p.y, tx - p.x);
+        bullets.push({x: p.x, y: p.y, vx: Math.cos(ang)*10, vy: Math.sin(ang)*10});
+    };
 
-    <canvas id="gameCanvas"></canvas>
+    function spawn() {
+        if(!active) return;
+        enemies.push({x: Math.random()*w, y: Math.random() < 0.5 ? 0 : h, s: 1.5});
+        setTimeout(spawn, 1000);
+    }
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const healthEl = document.getElementById('health');
+    function draw() {
+        if(!active) return;
+        x.fillStyle = "black"; x.fillRect(0,0,w,h);
+        
+        // Player
+        x.fillStyle = "cyan"; x.beginPath(); x.arc(p.x, p.y, 15, 0, 7); x.fill();
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        // Bullets
+        bullets.forEach((b,i) => {
+            b.x += b.vx; b.y += b.vy;
+            x.fillStyle = "yellow"; x.fillRect(b.x, b.y, 5, 5);
+        });
 
-        // Assets
-        const playerImg = new Image();
-        playerImg.src = 'https://cdn-icons-png.flaticon.com/512/805/805370.png';
+        // Enemies
+        enemies.forEach((e,i) => {
+            let ang = Math.atan2(p.y - e.y, p.x - e.x);
+            e.x += Math.cos(ang)*e.s; e.y += Math.sin(ang)*e.s;
+            x.fillStyle = "red"; x.beginPath(); x.arc(e.x, e.y, 15, 0, 7); x.fill();
 
-        const zombieImg = new Image();
-        zombieImg.src = 'https://cdn-icons-png.flaticon.com/512/1141/1141771.png';
-
-        let score = 0;
-        let health = 100;
-        let gameActive = true;
-        let player = { x: canvas.width/2, y: canvas.height/2, size: 50 };
-        const bullets = [];
-        const enemies = [];
-
-        // Shooting Logic (Mouse & Touch)
-        function shoot(e) {
-            if (!gameActive) return;
-            const clickX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clickY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            const angle = Math.atan2(clickY - player.y, clickX - player.x);
-            bullets.push({ 
-                x: player.x, 
-                y: player.y, 
-                vx: Math.cos(angle) * 12, 
-                vy: Math.sin(angle) * 12 
-            });
-        }
-
-        window.addEventListener('mousedown', shoot);
-        window.addEventListener('touchstart', (e) => { e.preventDefault(); shoot(e); }, {passive: false});
-
-        function spawnEnemy() {
-            if (!gameActive) return;
-            const size = 45;
-            let x, y;
-            // Screen ke bahar se spawn karna
-            if (Math.random() < 0.5) {
-                x = Math.random() < 0.5 ? -size : canvas.width + size;
-                y = Math.random() * canvas.height;
-            } else {
-                x = Math.random() * canvas.width;
-                y = Math.random() < 0.5 ? -size : canvas.height + size;
+            if(Math.hypot(p.x-e.x, p.y-e.y) < 30) { 
+                health -= 1; document.getElementById('hp').innerText = health;
+                if(health <= 0) { active = false; alert("GAME OVER! KILLS: " + score); location.reload(); }
             }
-            enemies.push({ x, y, size, speed: 1.5 + (score/50) });
-            
-            let spawnRate = Math.max(300, 1000 - (score * 10));
-            setTimeout(spawnEnemy, spawnRate);
-        }
 
-        function update() {
-            if (!gameActive) return;
-
-            ctx.fillStyle = "#1a1a1a";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Player Center Mein Rahega
-            ctx.drawImage(playerImg, player.x - player.size/2, player.y - player.size/2, player.size, player.size);
-
-            // Bullets Update
-            bullets.forEach((b, bi) => {
-                b.x += b.vx; b.y += b.vy;
-                ctx.fillStyle = '#00ff00';
-                ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill();
-                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(bi, 1);
-            });
-
-            // Enemies Update
-            enemies.forEach((en, ei) => {
-                const angle = Math.atan2(player.y - en.y, player.x - en.x);
-                en.x += Math.cos(angle) * en.speed;
-                en.y += Math.sin(angle) * en.speed;
-
-                ctx.drawImage(zombieImg, en.x - en.size/2, en.y - en.size/2, en.size, en.size);
-
-                // Collision with Player
-                const dist = Math.hypot(player.x - en.x, player.y - en.y);
-                if (dist < 35) {
-                    enemies.splice(ei, 1);
-                    health -= 20;
-                    healthEl.innerText = health;
-                    if (health <= 0) { 
-                        gameActive = false; 
-                        document.getElementById('gameOver').style.display = 'block';
-                        document.getElementById('finalScore').innerText = "Kills: " + score;
-                    }
+            bullets.forEach((b,bi) => {
+                if(Math.hypot(b.x-e.x, b.y-e.y) < 20) {
+                    enemies.splice(i,1); bullets.splice(bi,1);
+                    score++; document.getElementById('sc').innerText = score;
                 }
-
-                // Hit by Bullet
-                bullets.forEach((b, bi) => {
-                    const bDist = Math.hypot(b.x - en.x, b.y - en.y);
-                    if (bDist < 25) {
-                        enemies.splice(ei, 1);
-                        bullets.splice(bi, 1);
-                        score += 1;
-                        scoreEl.innerText = score;
-                    }
-                });
             });
-
-            requestAnimationFrame(update);
-        }
-
-        // Start Game
-        spawnEnemy();
-        update();
-    </script>
+        });
+        requestAnimationFrame(draw);
+    }
+    spawn(); draw();
+</script>
 </body>
 </html>
