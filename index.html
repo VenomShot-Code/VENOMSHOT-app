@@ -2,15 +2,17 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VENOMSHOT FIX</title>
+    <title>VENOMSHOT AUDIO FIX</title>
     <style>
-        body { margin: 0; background: #111; color: red; overflow: hidden; touch-action: none; text-align: center; }
+        body { margin: 0; background: #111; color: white; overflow: hidden; touch-action: none; text-align: center; font-family: sans-serif; }
         canvas { display: block; background: #000; margin: 0 auto; }
-        #stats { position: fixed; top: 10px; left: 10px; font-family: sans-serif; font-size: 20px; }
+        #stats { position: fixed; top: 10px; left: 10px; font-size: 20px; z-index: 10; }
+        #msg { position: fixed; top: 50%; width: 100%; font-size: 18px; color: yellow; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="stats">KILLS: <span id="sc">0</span> | HP: <span id="hp">100</span></div>
+    <div id="msg">TAP TO START & SHOOT</div>
     <canvas id="g"></canvas>
 
 <script>
@@ -19,16 +21,32 @@
     let score = 0, health = 100, active = true;
     let p = {x: w/2, y: h/2}, bullets = [], enemies = [];
 
+    // --- AUDIO SYSTEM ---
+    const shootSound = new Audio('https://codesandbox.io/api/v1/sandboxes/66v6s/assets/shot.mp3'); 
+    const hitSound = new Audio('https://actions.google.com/sounds/v1/science_fiction/low_f_sci_fi_hum.ogg');
+    const bgMusic = new Audio('https://actions.google.com/sounds/v1/horror/creepy_sludge_movement.ogg');
+    bgMusic.loop = true;
+
     window.onmousedown = window.ontouchstart = (e) => {
         if(!active) return;
+        
+        // Music start karne ke liye (Browser policy)
+        if(bgMusic.paused) bgMusic.play();
+        document.getElementById('msg').style.display = 'none';
+
         let tx = e.clientX || e.touches[0].clientX, ty = e.clientY || e.touches[0].clientY;
         let ang = Math.atan2(ty - p.y, tx - p.x);
-        bullets.push({x: p.x, y: p.y, vx: Math.cos(ang)*10, vy: Math.sin(ang)*10});
+        
+        // Goli ki awaaz
+        shootSound.currentTime = 0;
+        shootSound.play();
+
+        bullets.push({x: p.x, y: p.y, vx: Math.cos(ang)*12, vy: Math.sin(ang)*12});
     };
 
     function spawn() {
         if(!active) return;
-        enemies.push({x: Math.random()*w, y: Math.random() < 0.5 ? 0 : h, s: 1.5});
+        enemies.push({x: Math.random()*w, y: Math.random() < 0.5 ? 0 : h, s: 1.8});
         setTimeout(spawn, 1000);
     }
 
@@ -36,28 +54,40 @@
         if(!active) return;
         x.fillStyle = "black"; x.fillRect(0,0,w,h);
         
-        // Player
-        x.fillStyle = "cyan"; x.beginPath(); x.arc(p.x, p.y, 15, 0, 7); x.fill();
+        // Player (Survivor)
+        x.fillStyle = "lime"; x.beginPath(); x.arc(p.x, p.y, 18, 0, 7); x.fill();
+        x.strokeStyle = "white"; x.stroke();
 
         // Bullets
         bullets.forEach((b,i) => {
             b.x += b.vx; b.y += b.vy;
-            x.fillStyle = "yellow"; x.fillRect(b.x, b.y, 5, 5);
+            x.fillStyle = "yellow"; x.beginPath(); x.arc(b.x, b.y, 4, 0, 7); x.fill();
+            if(b.x<0 || b.x>w || b.y<0 || b.y>h) bullets.splice(i,1);
         });
 
-        // Enemies
+        // Enemies (Zombies)
         enemies.forEach((e,i) => {
             let ang = Math.atan2(p.y - e.y, p.x - e.x);
             e.x += Math.cos(ang)*e.s; e.y += Math.sin(ang)*e.s;
             x.fillStyle = "red"; x.beginPath(); x.arc(e.x, e.y, 15, 0, 7); x.fill();
 
+            // Player Damage
             if(Math.hypot(p.x-e.x, p.y-e.y) < 30) { 
-                health -= 1; document.getElementById('hp').innerText = health;
-                if(health <= 0) { active = false; alert("GAME OVER! KILLS: " + score); location.reload(); }
+                health -= 2; 
+                document.getElementById('hp').innerText = Math.max(0, health);
+                if(health <= 0) { 
+                    active = false; 
+                    bgMusic.pause();
+                    alert("MISSION FAILED! Kills: " + score); 
+                    location.reload(); 
+                }
             }
 
+            // Zombie Hit
             bullets.forEach((b,bi) => {
                 if(Math.hypot(b.x-e.x, b.y-e.y) < 20) {
+                    hitSound.currentTime = 0;
+                    hitSound.play();
                     enemies.splice(i,1); bullets.splice(bi,1);
                     score++; document.getElementById('sc').innerText = score;
                 }
