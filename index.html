@@ -2,24 +2,28 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VENOMSHOT SURVIVAL</title>
+    <title>VENOMSHOT ZOMBIE SURVIVAL</title>
     <style>
-        body { margin: 0; background: #111; color: white; font-family: sans-serif; overflow: hidden; touch-action: none; }
-        canvas { display: block; background: radial-gradient(circle, #222, #000); }
-        #ui { position: fixed; top: 10px; left: 10px; pointer-events: none; }
-        .stat { font-size: 20px; font-weight: bold; color: #ff0000; text-shadow: 0 0 5px #000; }
-        #joystick { position: fixed; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid #555; }
-        #stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: #ff0000; border-radius: 50%; opacity: 0.7; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
+        canvas { display: block; background: url('https://img.freepik.com/free-vector/dark-ground-texture-background_1308-62438.jpg'); background-size: cover; }
+        #ui { position: fixed; top: 15px; left: 15px; pointer-events: none; z-index: 10; }
+        .stat { font-size: 24px; color: #ff0000; text-shadow: 2px 2px #000; margin-bottom: 5px; }
+        #gameOver { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(0,0,0,0.9); padding: 40px; border: 3px solid red; border-radius: 20px; }
     </style>
 </head>
 <body>
 
     <div id="ui">
-        <div class="stat">SCORE: <span id="score">0</span></div>
-        <div class="stat">HEALTH: <span id="health">100</span>%</div>
+        <div class="stat">KILLS: <span id="score">0</span></div>
+        <div class="stat">HP: <span id="health">100</span>%</div>
     </div>
 
-    <div id="joystick"><div id="stick"></div></div>
+    <div id="gameOver">
+        <h1 style="color: red; font-size: 50px;">YOU DIED</h1>
+        <p id="finalScore" style="color: white;"></p>
+        <button onclick="location.reload()" style="padding: 15px 30px; background: red; color: white; border: none; font-weight: bold; cursor: pointer;">RESTART MISSION</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -31,93 +35,40 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
+        // --- ASSETS (Images) ---
+        const playerImg = new Image();
+        playerImg.src = 'https://cdn-icons-png.flaticon.com/512/805/805370.png'; // Masked Hero
+
+        const zombieImg = new Image();
+        zombieImg.src = 'https://cdn-icons-png.flaticon.com/512/1141/1141771.png'; // Zombie Icon
+
         let score = 0;
         let health = 100;
         let gameActive = true;
 
-        const player = { x: canvas.width/2, y: canvas.height/2, radius: 15, color: '#00ffff' };
+        const player = { x: canvas.width/2, y: canvas.height/2, size: 50 };
         const bullets = [];
         const enemies = [];
 
-        // Shooting logic (Click or Touch)
+        // Shooting
         window.addEventListener('touchstart', (e) => {
             if (!gameActive) return;
             const touch = e.touches[0];
             const angle = Math.atan2(touch.clientY - player.y, touch.clientX - player.x);
-            bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 8, vy: Math.sin(angle) * 8 });
+            bullets.push({ 
+                x: player.x, 
+                y: player.y, 
+                vx: Math.cos(angle) * 10, 
+                vy: Math.sin(angle) * 10 
+            });
         });
 
         function spawnEnemy() {
             if (!gameActive) return;
-            const radius = 15;
+            const size = 45;
             let x, y;
             if (Math.random() < 0.5) {
-                x = Math.random() < 0.5 ? 0 - radius : canvas.width + radius;
+                x = Math.random() < 0.5 ? -size : canvas.width + size;
                 y = Math.random() * canvas.height;
             } else {
-                x = Math.random() * canvas.width;
-                y = Math.random() < 0.5 ? 0 - radius : canvas.height + radius;
-            }
-            enemies.push({ x, y, radius, color: 'red', speed: 1.5 + (score/100) });
-            setTimeout(spawnEnemy, 1000 - (score * 5));
-        }
-
-        function update() {
-            if (!gameActive) return;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Player
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-            ctx.fillStyle = player.color;
-            ctx.fill();
-
-            // Update Bullets
-            bullets.forEach((b, bi) => {
-                b.x += b.vx; b.y += b.vy;
-                ctx.fillStyle = 'yellow';
-                ctx.fillRect(b.x, b.y, 5, 5);
-                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(bi, 1);
-            });
-
-            // Update Enemies
-            enemies.forEach((en, ei) => {
-                const angle = Math.atan2(player.y - en.y, player.x - en.x);
-                en.x += Math.cos(angle) * en.speed;
-                en.y += Math.sin(angle) * en.speed;
-
-                ctx.beginPath();
-                ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2);
-                ctx.fillStyle = en.color;
-                ctx.fill();
-
-                // Enemy touches Player
-                const dist = Math.hypot(player.x - en.x, player.y - en.y);
-                if (dist - en.radius - player.radius < 1) {
-                    enemies.splice(ei, 1);
-                    health -= 10;
-                    healthEl.innerText = health;
-                    if (health <= 0) { gameActive = false; alert("GAME OVER! Score: " + score); location.reload(); }
-                }
-
-                // Bullet hits Enemy
-                bullets.forEach((b, bi) => {
-                    const bDist = Math.hypot(b.x - en.x, b.y - en.y);
-                    if (bDist < en.radius) {
-                        enemies.splice(ei, 1);
-                        bullets.splice(bi, 1);
-                        score += 10;
-                        scoreEl.innerText = score;
-                    }
-                });
-            });
-
-            requestAnimationFrame(update);
-        }
-
-        spawnEnemy();
-        update();
-    </script>
-</body>
-</html>
+                x = Math.random() * canvas
