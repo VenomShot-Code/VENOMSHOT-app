@@ -1,64 +1,123 @@
 <!DOCTYPE html>
 <html>
-<body id="bg" style="background: white; text-align: center; transition: 0.5s;">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VENOMSHOT SURVIVAL</title>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        canvas { display: block; background: radial-gradient(circle, #222, #000); }
+        #ui { position: fixed; top: 10px; left: 10px; pointer-events: none; }
+        .stat { font-size: 20px; font-weight: bold; color: #ff0000; text-shadow: 0 0 5px #000; }
+        #joystick { position: fixed; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid #555; }
+        #stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: #ff0000; border-radius: 50%; opacity: 0.7; }
+    </style>
+</head>
+<body>
 
-  <h1 id="heading" style="color: black;">Coding Mode: Light ☀️</h1>
-
-  <button onclick="badloMode()" style="padding: 15px; cursor: pointer; border-radius: 10px;">
-    Switch Mode 🔄
-  </button>
-
-  <script>
-    function badloMode() {
-      let body = document.getElementById("bg");
-      let text = document.getElementById("heading");
-
-      // Agar background white hai, toh black kar do
-      if (body.style.background == "white") {
-        body.style.background = "black";
-        text.style.color = "white";
-        text.innerHTML = "Coding Mode: Dark 🌙";
-      } 
-      // Warna wapas white kar do
-      else {
-        body.style.background = "white";
-        text.style.color = "black";
-        text.innerHTML = "Coding Mode: Light ☀️";
-      }
-    }
-  </script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html>
-<body style="background: #000; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
-
-  <div style="background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); padding: 30px; border-radius: 25px; border: 1px solid #ff0000; box-shadow: 0 0 30px rgba(255, 0, 0, 0.2); text-align: center; width: 300px; color: white;">
-    
-    <div style="position: relative; display: inline-block;">
-        <img src="https://cdn-icons-png.flaticon.com/512/805/805370.png" width="120" style="border-radius: 20px; border: 2px solid #ff0000; margin-bottom: 10px;">
-        <div style="position: absolute; bottom: 15px; right: -5px; background: #ff0000; color: white; padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: bold;">LIVE</div>
+    <div id="ui">
+        <div class="stat">SCORE: <span id="score">0</span></div>
+        <div class="stat">HEALTH: <span id="health">100</span>%</div>
     </div>
 
-    <h2 style="margin: 0; color: #ff0000; text-transform: uppercase;">Venom Shot</h2>
-    <p style="color: #888; margin-top: 5px;">Pro Gamer & YouTuber</p>
+    <div id="joystick"><div id="stick"></div></div>
+    <canvas id="gameCanvas"></canvas>
 
-    <div style="background: #222; padding: 10px; border-radius: 10px; margin: 20px 0; border-left: 5px solid #ff0000;">
-        <small style="color: #ff0000; font-weight: bold;">GAME ID:</small>
-        <div style="font-size: 18px; font-weight: bold; letter-spacing: 1px;">7613393999</div> </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const healthEl = document.getElementById('health');
 
-    <a href="https://youtube.com/@venomshot1?si=1ghpIdCYZPloEk-B" target="_blank" style="text-decoration: none;">
-      <div style="background: #ff0000; color: white; padding: 12px; border-radius: 10px; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 10px;">
-         Subscribe YouTube
-      </div>
-    </a>
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-    <button onclick="alert('ID Copied!')" style="width: 100%; background: transparent; color: #ff0000; border: 1px solid #ff0000; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: bold;">
-        Copy Game ID
-    </button>
+        let score = 0;
+        let health = 100;
+        let gameActive = true;
 
-  </div>
+        const player = { x: canvas.width/2, y: canvas.height/2, radius: 15, color: '#00ffff' };
+        const bullets = [];
+        const enemies = [];
 
+        // Shooting logic (Click or Touch)
+        window.addEventListener('touchstart', (e) => {
+            if (!gameActive) return;
+            const touch = e.touches[0];
+            const angle = Math.atan2(touch.clientY - player.y, touch.clientX - player.x);
+            bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 8, vy: Math.sin(angle) * 8 });
+        });
+
+        function spawnEnemy() {
+            if (!gameActive) return;
+            const radius = 15;
+            let x, y;
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? 0 - radius : canvas.width + radius;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? 0 - radius : canvas.height + radius;
+            }
+            enemies.push({ x, y, radius, color: 'red', speed: 1.5 + (score/100) });
+            setTimeout(spawnEnemy, 1000 - (score * 5));
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Player
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = player.color;
+            ctx.fill();
+
+            // Update Bullets
+            bullets.forEach((b, bi) => {
+                b.x += b.vx; b.y += b.vy;
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(b.x, b.y, 5, 5);
+                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(bi, 1);
+            });
+
+            // Update Enemies
+            enemies.forEach((en, ei) => {
+                const angle = Math.atan2(player.y - en.y, player.x - en.x);
+                en.x += Math.cos(angle) * en.speed;
+                en.y += Math.sin(angle) * en.speed;
+
+                ctx.beginPath();
+                ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2);
+                ctx.fillStyle = en.color;
+                ctx.fill();
+
+                // Enemy touches Player
+                const dist = Math.hypot(player.x - en.x, player.y - en.y);
+                if (dist - en.radius - player.radius < 1) {
+                    enemies.splice(ei, 1);
+                    health -= 10;
+                    healthEl.innerText = health;
+                    if (health <= 0) { gameActive = false; alert("GAME OVER! Score: " + score); location.reload(); }
+                }
+
+                // Bullet hits Enemy
+                bullets.forEach((b, bi) => {
+                    const bDist = Math.hypot(b.x - en.x, b.y - en.y);
+                    if (bDist < en.radius) {
+                        enemies.splice(ei, 1);
+                        bullets.splice(bi, 1);
+                        score += 10;
+                        scoreEl.innerText = score;
+                    }
+                });
+            });
+
+            requestAnimationFrame(update);
+        }
+
+        spawnEnemy();
+        update();
+    </script>
 </body>
 </html>
